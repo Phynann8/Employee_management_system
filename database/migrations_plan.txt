@@ -1,0 +1,121 @@
+<?php
+// MIGRATION 1: Organization Structure (Companies, Campuses, Departments, Roles)
+
+// create_companies_table
+Schema::create('companies', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->timestamps();
+});
+
+// create_campuses_table
+Schema::create('campuses', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('company_id')->constrained('companies')->onDelete('cascade');
+    $table->string('name');
+    $table->string('location')->nullable();
+    $table->timestamps();
+});
+
+// create_departments_table
+Schema::create('departments', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('campus_id')->constrained('campuses')->onDelete('cascade');
+    $table->string('name');
+    $table->timestamps();
+});
+
+// create_roles_table
+Schema::create('roles', function (Blueprint $table) {
+    $table->id();
+    $table->string('name'); // Employee, HR, Admin, etc.
+    $table->integer('level')->default(1);
+    $table->timestamps();
+});
+
+
+// MIGRATION 2: User Access & Employees
+
+// create_users_table (Modify default or create new if not exists)
+Schema::table('users', function (Blueprint $table) {
+    // Assuming default users table has id, name, email, password
+    $table->foreignId('role_id')->nullable()->constrained('roles');
+});
+
+// create_employees_table
+Schema::create('employees', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+    $table->foreignId('department_id')->constrained('departments');
+    $table->string('employee_code')->unique(); // EMP-001
+    $table->string('full_name');
+    $table->string('gender')->nullable();
+    $table->date('date_of_birth');
+    $table->date('join_date');
+    $table->string('employment_status')->default('Probation'); // Probation, Permanent, Resigned
+    $table->decimal('basic_salary', 12, 2);
+    $table->timestamps();
+});
+
+
+// MIGRATION 3: HR Modules (Attendance, Leave)
+
+// create_attendance_logs_table
+Schema::create('attendance_logs', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('employee_id')->constrained('employees')->onDelete('cascade');
+    $table->dateTime('check_in');
+    $table->dateTime('check_out')->nullable();
+    $table->string('source')->default('Biometric'); // Mobile, Web, Biometric
+    $table->timestamps();
+});
+
+// create_leave_types_table
+Schema::create('leave_types', function (Blueprint $table) {
+    $table->id();
+    $table->string('name'); // Annual, Sick, Unpaid
+    $table->integer('annual_quota')->default(18);
+    $table->timestamps();
+});
+
+// create_leave_balances_table
+Schema::create('leave_balances', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('employee_id')->constrained('employees')->onDelete('cascade');
+    $table->foreignId('leave_type_id')->constrained('leave_types');
+    $table->integer('balance');
+    $table->timestamps();
+});
+
+// create_leave_requests_table
+Schema::create('leave_requests', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('employee_id')->constrained('employees')->onDelete('cascade');
+    $table->foreignId('leave_type_id')->constrained('leave_types');
+    $table->date('start_date');
+    $table->date('end_date');
+    $table->string('status')->default('Pending'); // Pending, Approved, Rejected
+    $table->timestamps();
+});
+
+
+// MIGRATION 4: Payroll
+
+// create_payroll_runs_table
+Schema::create('payroll_runs', function (Blueprint $table) {
+    $table->id();
+    $table->string('month'); // YYYY-MM
+    $table->string('status')->default('Draft'); // Draft, Locked, Paid
+    $table->timestamps();
+});
+
+// create_payroll_items_table
+Schema::create('payroll_items', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('payroll_run_id')->constrained('payroll_runs')->onDelete('cascade');
+    $table->foreignId('employee_id')->constrained('employees');
+    $table->decimal('gross_salary', 12, 2);
+    $table->decimal('tax_amount', 12, 2);
+    $table->decimal('net_salary', 12, 2);
+    $table->timestamps();
+});
